@@ -2,10 +2,10 @@ import pandas as pd
 from pathlib import Path
 from httpx import Client
 from typing import Optional
+from src.bootcamp_data.config import make_paths
+import time
 import atexit
 
-output_dir = Path("./data/processed/")
-input_dir = Path("./data/raw/")
 _default_client: Optional[Client] = None
 NA_LIST = ["", "NA", "N/A", "null", "None"]
 
@@ -54,15 +54,36 @@ def read_parquet(filepath: Path) -> pd.DataFrame:
     return df
 
 
-def get_and_parseURL(url: str, client: Optional[Client] = None) -> pd.DataFrame:
+def get_url(url: str, client: Optional[Client] = None) -> str:
     if client is None:
         client = _get_default_client()
 
     response = client.get(url)
     response.raise_for_status()
     data = response.json()
-    df = pd.json_normalize(data)
-    return df
+    return data
+
+
+# ttl is optional
+def fetch_from_cache(
+    url: str,
+    cache_path: Path,
+    client: Optional[Client] = None,
+    ttl: Optional[int] = None,
+) -> str:
+    cache_path.parent.mkdir(parents=True, exist_ok=True)
+    if client is None:
+        client = _get_default_client()
+
+    if cache_path.exists():
+        age_s = time.time() - cache_path.stat().st_mtime
+        if ttl is None or age_s < ttl:
+            data = json.loads(cache_path.read_text())
+            return data
+    data = get_and_parseURL(url, client)
+    cache_path.write_text(json.dumps(data))
+
+    return data
 
 
 def outputMD(df: pd.DataFrame, outpath: Path):
@@ -72,8 +93,13 @@ def outputMD(df: pd.DataFrame, outpath: Path):
 
 
 if __name__ == "__main__":
+    ROOT_DIR = Path(__file__).resolve().parents[1]
+
+    output_dir, input_dir, cache_dir = make_paths(ROOT_DIR)
+
     sample_url = "https://jsonplaceholder.typicode.com/posts"
-    df = get_and_parseURL(sample_url)
+    data = fetch_from_cache(sample_url, cache_dir / "posts.parquet")
+    df = pd.DataFrame(data)
     output_path = output_dir / "output.md"
     output_path.parent.mkdir(parents=True, exist_ok=True)
     outputMD(df, output_path)

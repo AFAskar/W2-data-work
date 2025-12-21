@@ -2,7 +2,8 @@ import pandas as pd
 from pathlib import Path
 from httpx import Client
 from typing import Optional
-from src.bootcamp_data.config import make_paths
+import json
+
 import time
 import atexit
 
@@ -80,7 +81,7 @@ def fetch_from_cache(
         if ttl is None or age_s < ttl:
             data = json.loads(cache_path.read_text())
             return data
-    data = get_and_parseURL(url, client)
+    data = get_url(url, client)
     cache_path.write_text(json.dumps(data))
 
     return data
@@ -93,12 +94,20 @@ def outputMD(df: pd.DataFrame, outpath: Path):
 
 
 if __name__ == "__main__":
-    ROOT_DIR = Path(__file__).resolve().parents[1]
+    SRC = Path(__file__).resolve().parents[1]
+    import sys
 
-    output_dir, input_dir, cache_dir = make_paths(ROOT_DIR)
+    if str(SRC) not in sys.path:
+        sys.path.insert(0, str(SRC))
 
+    from bootcamp_data.config import make_paths
+
+    ROOT_DIR = Path(__file__).resolve().parents[2]
+    paths = make_paths(ROOT_DIR)
+    cache_dir = paths.cache
+    output_dir = paths.processed
     sample_url = "https://jsonplaceholder.typicode.com/posts"
-    data = fetch_from_cache(sample_url, cache_dir / "posts.parquet")
+    data = fetch_from_cache(sample_url, cache_dir / "posts.json")
     df = pd.DataFrame(data)
     output_path = output_dir / "output.md"
     output_path.parent.mkdir(parents=True, exist_ok=True)

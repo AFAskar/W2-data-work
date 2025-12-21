@@ -1,0 +1,11 @@
+{
+  "timestamp_utc": "2025-12-21T15:02:04.448876+00:00",
+  "rows": {
+    "orders": 5,
+    "users": 4
+  },
+  "outputs": {
+    "orders": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/processed/orders.parquet",
+    "users": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/processed/users.parquet"
+  }
+}

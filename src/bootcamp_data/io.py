@@ -7,6 +7,7 @@ import atexit
 output_dir = Path("./data/processed/")
 input_dir = Path("./data/raw/")
 _default_client: Optional[Client] = None
+NA_LIST = ["", "NA", "N/A", "null", "None"]
 
 
 def _get_default_client() -> Client:
@@ -15,6 +16,42 @@ def _get_default_client() -> Client:
         _default_client = Client()
         atexit.register(_default_client.close)
     return _default_client
+
+
+def read_order_csv(filepath: Path) -> pd.DataFrame:
+    df = pd.read_csv(
+        filepath,
+        na_values=NA_LIST,
+        dtype={
+            "order_id": str,
+            "user_id": str,
+        },
+        keep_default_na=True,
+    )
+    return df
+
+
+def read_user_csv(filepath: Path) -> pd.DataFrame:
+    df = pd.read_csv(
+        filepath,
+        na_values=NA_LIST,
+        dtype={
+            "user_id": str,
+        },
+        keep_default_na=True,
+    )
+    return df
+
+
+def write_parquet(df: pd.DataFrame, outpath: Path):
+    outpath.parent.mkdir(parents=True, exist_ok=True)
+    df.to_parquet(outpath, index=False)
+    return
+
+
+def read_parquet(filepath: Path) -> pd.DataFrame:
+    df = pd.read_parquet(filepath)
+    return df
 
 
 def get_and_parseURL(url: str, client: Optional[Client] = None) -> pd.DataFrame:

@@ -22,8 +22,11 @@ def main() -> None:
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
     paths = config.make_paths(ROOT)
-    orders = enforce_schema(read_order_csv(paths.raw / "orders.csv"))
-    users = read_user_csv(paths.raw / "users.csv")
+    order_file = paths.raw / "orders.csv"
+    orders = read_order_csv(order_file)
+    orders = enforce_schema(orders)
+    user_file = paths.raw / "users.csv"
+    users = read_user_csv(user_file)
     logger.info("Loaded rows: orders=%s users=%s", len(orders), len(users))
     logger.info("Orders dtypes:\n%s", orders.dtypes)
     out_orders = paths.processed / "orders.parquet"

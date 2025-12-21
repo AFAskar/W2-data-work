@@ -24,8 +24,8 @@ def read_order_csv(filepath: Path) -> pd.DataFrame:
         filepath,
         na_values=NA_LIST,
         dtype={
-            "order_id": str,
-            "user_id": str,
+            "order_id": "string",
+            "user_id": "string",
         },
         keep_default_na=True,
     )

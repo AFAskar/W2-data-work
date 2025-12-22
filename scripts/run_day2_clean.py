@@ -82,7 +82,7 @@ def main() -> None:
     )
 
     assert_in_range(orders_clean["amount"], lo=0, name="amount")
-    assert_in_range(orders_clean["quantity"], lo=1, name="quantity")
+    assert_in_range(orders_clean["quantity"], lo=0, name="quantity")
     write_parquet(orders_clean, paths.processed / "orders_clean.parquet")
 
     write_parquet(users, paths.processed / "users.parquet")

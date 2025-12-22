@@ -10,7 +10,7 @@ def enforce_order_schema(df: pd.DataFrame) -> pd.DataFrame:
         user_id=df["user_id"].astype(str),
         amount=pd.to_numeric(df["amount"], errors="coerce").astype("Float64"),
         quantity=pd.to_numeric(df["quantity"], errors="coerce").astype("Int64"),
-        status=df["status"].str.title(),
+        status=df["status"].astype("string"),
         created_at=pd.to_datetime(df["created_at"], errors="coerce"),
     )
 

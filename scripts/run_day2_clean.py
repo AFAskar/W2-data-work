@@ -64,6 +64,14 @@ def main() -> None:
     assert_non_empty(order_raw)
     assert_non_empty(user_raw)
     orders = enforce_order_schema(order_raw)
+    # report
+    rep = missingness_report(orders)
+    reports_dir = paths.root / "reports"
+    reports_dir.mkdir(parents=True, exist_ok=True)
+    rep_path = reports_dir / "missingness_orders.csv"
+    rep.to_csv(rep_path)
+    logger.info("Wrote missingness report to %s", rep_path)
+
     users = enforce_user_schema(user_raw)
     assert_unique_key(users, "user_id", allow_na=False)
 
@@ -77,12 +85,12 @@ def main() -> None:
     status_norm = normalize_text(orders["status"])
     mapping = {"paid": "paid", "refund": "refund", "refunded": "refund"}
     status_clean = apply_mapping(status_norm, mapping)
-    orders_clean = orders.assign(status=status_clean).pipe(
+    orders_clean = orders.assign(status_clean=status_clean).pipe(
         add_missing_flags, cols=["amount", "quantity"]
     )
-
     assert_in_range(orders_clean["amount"], lo=0, name="amount")
     assert_in_range(orders_clean["quantity"], lo=0, name="quantity")
+
     write_parquet(orders_clean, paths.processed / "orders_clean.parquet")
 
     write_parquet(users, paths.processed / "users.parquet")

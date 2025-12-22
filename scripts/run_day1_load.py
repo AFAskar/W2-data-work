@@ -12,7 +12,7 @@ if str(SRC) not in sys.path:
 
 import bootcamp_data.config as config
 from bootcamp_data.io import read_order_csv, read_user_csv, write_parquet
-from bootcamp_data.transforms import enforce_schema
+from bootcamp_data.transforms import enforce_order_schema
 
 logger = logging.getLogger(__name__)
 
@@ -24,7 +24,7 @@ def main() -> None:
     paths = config.make_paths(ROOT)
     order_file = paths.raw / "orders.csv"
     orders = read_order_csv(order_file)
-    orders = enforce_schema(orders)
+    orders = enforce_order_schema(orders)
     user_file = paths.raw / "users.csv"
     users = read_user_csv(user_file)
     logger.info("Loaded rows: orders=%s users=%s", len(orders), len(users))

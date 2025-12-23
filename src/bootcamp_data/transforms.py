@@ -153,7 +153,6 @@ def enforce_user_schema(df: pd.DataFrame) -> pd.DataFrame:
     return df.assign(
         user_id=df["user_id"].astype(str),
         country=df["country"].astype("string"),
-        signup_date=pd.to_datetime(df["signup_date"], errors="coerce", utc=True),
     )
 
 

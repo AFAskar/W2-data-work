@@ -112,6 +112,20 @@ def main() -> None:
     write_parquet(joined, out_path)
     logger.info(f"Wrote analysis table to {out_path}")
 
+    # reports (Revenue by country, count of orders by country)
+    report = (
+        joined.groupby("country", dropna=False)
+        .agg(
+            total_revenue=pd.NamedAgg(column="amount", aggfunc="sum"),
+            order_count=pd.NamedAgg(column="order_id", aggfunc="count"),
+        )
+        .reset_index()
+        .sort_values(by="total_revenue", ascending=False)
+    )
+    report_path = reports_dir / "revenue_by_country.csv"
+    report.to_csv(report_path, index=False)
+    logger.info(f"Wrote revenue by country report to {report_path}")
+
 
 if __name__ == "__main__":
     main()

@@ -57,8 +57,12 @@ def iqr_bounds(s: pd.Series, k: float = 1.5) -> tuple[float, float]:
         Tuple of (lo, hi) bounds
     """
     x = s.dropna()
-    q1 = x.quantile(0.25, interpolation="lower")
-    q3 = x.quantile(0.75, interpolation="higher")
+    q1 = x.quantile(
+        0.25,
+    )
+    q3 = x.quantile(
+        0.75,
+    )
     iqr = q3 - q1
     return float(q1 - k * iqr), float(q3 + k * iqr)
 

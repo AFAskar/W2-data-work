@@ -18,7 +18,10 @@ def enforce_order_schema(df: pd.DataFrame) -> pd.DataFrame:
 
 def add_time_parts(df: pd.DataFrame, ts_col: str) -> pd.DataFrame:
     """Add common time grouping keys (month, day-of-week, hour, etc.)."""
+    if ts_col not in df.columns:
+        raise ValueError(f"Timestamp column '{ts_col}' not found in DataFrame.")
     ts = df[ts_col]
+
     return df.assign(
         date=ts.dt.date,
         year=ts.dt.year,
@@ -134,8 +137,7 @@ def add_missing_flags(df: pd.DataFrame, cols: list[str]) -> pd.DataFrame:
     """
     out = df.copy()
     for c in cols:
-        # TODO: Create new column named f"{c}__isna" that is True where c is NA
-        out[f"{c}__isna"] = out[c].isna()  # TODO: your code here
+        out[f"{c}__isna"] = out[c].isna()
 
     return out
 
@@ -150,13 +152,7 @@ def normalize_text(s: pd.Series) -> pd.Series:
         Normalized series
     """
     return (
-        s.astype("string")
-        # TODO: Strip leading/trailing whitespace
-        .str.strip()  # TODO: your code here
-        # TODO: Lowercase using casefold
-        .str.casefold()  # TODO: your code here
-        # TODO: Replace multiple spaces with single space using _ws pattern
-        .str.replace(_ws, " ", regex=True)  # TODO: your code here
+        s.astype("string").str.strip().str.casefold().str.replace(_ws, " ", regex=True)
     )
 
 
@@ -170,8 +166,7 @@ def apply_mapping(s: pd.Series, mapping: dict) -> pd.Series:
     Returns:
         Series with mapped values
     """
-    # TODO: Use .map() with a lambda that looks up in mapping, defaulting to original
-    return s.map(lambda x: mapping.get(x, x))  # TODO: your code here
+    return s.map(lambda x: mapping.get(x, x))
 
 
 def dedupe_keep_latest(
@@ -188,11 +183,7 @@ def dedupe_keep_latest(
         Deduplicated DataFrame
     """
     return (
-        df
-        # TODO: Sort by timestamp column
-        .sort_values(ts_col)  # TODO: your code here
-        # TODO: Drop duplicates keeping last (latest) row
-        .drop_duplicates(subset=key_cols, keep="last")  # TODO: your code here
-        # TODO: Reset index
+        df.sort_values(ts_col)
+        .drop_duplicates(subset=key_cols, keep="last")
         .reset_index(drop=True)
     )

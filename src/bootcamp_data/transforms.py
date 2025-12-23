@@ -1,3 +1,4 @@
+from typing import Literal
 import pandas as pd
 import re
 
@@ -11,7 +12,88 @@ def enforce_order_schema(df: pd.DataFrame) -> pd.DataFrame:
         amount=pd.to_numeric(df["amount"], errors="coerce").astype("Float64"),
         quantity=pd.to_numeric(df["quantity"], errors="coerce").astype("Int64"),
         status=df["status"].astype("string"),
-        created_at=pd.to_datetime(df["created_at"], errors="coerce"),
+        created_at=pd.to_datetime(df["created_at"], errors="coerce", utc=True),
+    )
+
+
+def add_time_parts(df: pd.DataFrame, ts_col: str) -> pd.DataFrame:
+    """Add common time grouping keys (month, day-of-week, hour, etc.)."""
+    ts = df[ts_col]
+    return df.assign(
+        date=ts.dt.date,
+        year=ts.dt.year,
+        month=ts.dt.to_period("M").astype("string"),
+        dow=ts.dt.day_name(),
+        hour=ts.dt.hour,
+    )
+
+
+def iqr_bounds(s: pd.Series, k: float = 1.5) -> tuple[float, float]:
+    """Return (lo, hi) IQR bounds for outlier flagging."""
+    x = s.dropna()
+    q1 = x.quantile(0.25, interpolation="lower")
+    q3 = x.quantile(0.75, interpolation="higher")
+    iqr = q3 - q1
+    return float(q1 - k * iqr), float(q3 + k * iqr)
+
+
+def count_outliers(s: pd.Series, k: float = 1.5) -> int:
+    """Count number of outliers in series based on IQR method."""
+    lo, hi = iqr_bounds(s, k)
+    return int(((s < lo) | (s > hi)).sum())
+
+
+def add_outlier_flag(df: pd.DataFrame, col: str, *, k: float = 1.5) -> pd.DataFrame:
+    """Add a boolean flag for outliers based on IQR."""
+    lo, hi = iqr_bounds(df[col], k=k)
+    return df.assign(**{f"{col}__is_outlier": (df[col] < lo) | (df[col] > hi)})
+
+
+def winsorize(s: pd.Series, lo: float = 0.01, hi: float = 0.99) -> pd.Series:
+    """Cap values to [p_lo, p_hi] (helpful for visualization, not deletion)."""
+    x = s.dropna()
+    a, b = x.quantile(lo), x.quantile(hi)
+    return s.clip(lower=a, upper=b)
+
+
+def safe_left_join(
+    left: pd.DataFrame,
+    right: pd.DataFrame,
+    on: str | list[str],
+    *,
+    validate: (
+        Literal[
+            "one_to_one",
+            "1:1",
+            "one_to_many",
+            "1:m",
+            "many_to_one",
+            "m:1",
+            "many_to_many",
+            "m:m",
+        ]
+        | None
+    ),
+    suffixes: tuple[str, str] = ("", "_r"),
+):
+    """Perform a left join with validation and suffixes.
+
+    Args:
+        left: Left DataFrame
+        right: Right DataFrame
+        on: Column(s) to join on
+        validate: Validation string for pd.merge (e.g., '')
+        suffixes: Suffixes for overlapping columns
+    Returns:
+        Merged DataFrame
+    """
+    return pd.merge(
+        left,
+        right,
+        how="left",
+        on=on,
+        validate=validate,
+        suffixes=suffixes,
     )
 
 
@@ -19,7 +101,7 @@ def enforce_user_schema(df: pd.DataFrame) -> pd.DataFrame:
     return df.assign(
         user_id=df["user_id"].astype(str),
         country=df["country"].astype("string"),
-        signup_date=pd.to_datetime(df["signup_date"], errors="coerce"),
+        signup_date=pd.to_datetime(df["signup_date"], errors="coerce", utc=True),
     )
 
 

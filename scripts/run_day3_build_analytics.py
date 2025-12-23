@@ -37,20 +37,6 @@ from bootcamp_data.joins import safe_left_join
 logger = logging.getLogger(__name__)
 
 
-def build_analysis_table(orders: pd.DataFrame, users: pd.DataFrame) -> pd.DataFrame:
-    return (
-        orders.pipe(parse_datetime, col="created_at", utc=True)
-        .pipe(add_time_parts, ts_col="created_at")
-        .pipe(
-            safe_left_join,
-            users,
-            on="user_id",
-            validate="many_to_one",
-            suffixes=("", "_user"),
-        )
-    )
-
-
 def main() -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
@@ -60,7 +46,6 @@ def main() -> None:
     user_file = paths.processed / "users.parquet"
     reports_dir = paths.root / "reports"
     reports_dir.mkdir(parents=True, exist_ok=True)
-
     orders = pd.read_parquet(order_file)
     users = pd.read_parquet(user_file)
 
@@ -92,12 +77,15 @@ def main() -> None:
     order_t = orders.pipe(parse_datetime, col="created_at", utc=True).pipe(
         add_time_parts, ts_col="created_at"
     )
+    users_t = users.pipe(parse_datetime, col="signup_date", utc=True).pipe(
+        add_time_parts, ts_col="signup_date"
+    )
 
     n_missing_ts = int(order_t["created_at"].isna().sum())
     logger.info(f"Number of orders with missing created_at: {n_missing_ts}")
     joined = safe_left_join(
         order_t,
-        users,
+        users_t,
         on="user_id",
         validate="many_to_one",
         suffixes=("", "_user"),
@@ -113,7 +101,7 @@ def main() -> None:
     logger.info(f"Wrote analysis table to {out_path}")
 
     # reports (Revenue by country, count of orders by country)
-    report = (
+    report: pd.DataFrame = (
         joined.groupby("country", dropna=False)
         .agg(
             total_revenue=pd.NamedAgg(column="amount", aggfunc="sum"),

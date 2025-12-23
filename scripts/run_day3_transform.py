@@ -81,7 +81,7 @@ def main() -> None:
     assert_in_range(orders_clean["amount"], lo=0, name="amount")
     assert_in_range(orders_clean["quantity"], lo=0, name="quantity")
 
-    parse_datetime(orders_clean, "created_at")
+    orders_clean = parse_datetime(orders_clean, "created_at")
 
     print(orders_clean)
 

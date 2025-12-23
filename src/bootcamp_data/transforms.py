@@ -102,47 +102,6 @@ def winsorize(s: pd.Series, lo: float = 0.01, hi: float = 0.99) -> pd.Series:
     return s.clip(lower=a, upper=b)
 
 
-def safe_left_join(
-    left: pd.DataFrame,
-    right: pd.DataFrame,
-    on: str | list[str],
-    *,
-    validate: (
-        Literal[
-            "one_to_one",
-            "1:1",
-            "one_to_many",
-            "1:m",
-            "many_to_one",
-            "m:1",
-            "many_to_many",
-            "m:m",
-        ]
-        | None
-    ),
-    suffixes: tuple[str, str] = ("", "_r"),
-):
-    """Perform a left join with validation and suffixes.
-
-    Args:
-        left: Left DataFrame
-        right: Right DataFrame
-        on: Column(s) to join on
-        validate: Validation string for pd.merge (e.g., '')
-        suffixes: Suffixes for overlapping columns
-    Returns:
-        Merged DataFrame
-    """
-    return pd.merge(
-        left,
-        right,
-        how="left",
-        on=on,
-        validate=validate,
-        suffixes=suffixes,
-    )
-
-
 def enforce_user_schema(df: pd.DataFrame) -> pd.DataFrame:
     """Enforce user DataFrame schema.
     Args:

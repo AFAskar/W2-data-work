@@ -87,6 +87,44 @@ def get_all_neighborhoods(city: str = "الرياض") -> list[dict]:
     return neighborhoods
 
 
+# fall back to OSM API for Missing neighborhoods
+@memory.cache
+def osm_fallback(neighborhood: str) -> dict | None:
+    overpass_url = "http://overpass-api.de/api/interpreter"
+
+    overpass_query = f"""
+    [out:json][timeout:180];
+    (
+      node["place"~"neighbourhood|suburb"]["name"="{neighborhood}"];
+      way["place"~"neighbourhood|suburb"]["name"="{neighborhood}"];
+      relation["place"~"neighbourhood|suburb"]["name"="{neighborhood}"];
+    );
+    out center;
+    """
+
+    response = get(overpass_url, params={"data": overpass_query}, timeout=180)
+    response.raise_for_status()
+    data = response.json()
+
+    for element in data.get("elements", []):
+        if "tags" in element and "name" in element["tags"]:
+            if element["type"] == "node":
+                lat, lon = element["lat"], element["lon"]
+            elif "center" in element:
+                lat, lon = element["center"]["lat"], element["center"]["lon"]
+            else:
+                lat, lon = None, None
+
+            return {
+                "name": element["tags"]["name"],
+                "lat": lat,
+                "lon": lon,
+                "osm_id": element["id"],
+                "osm_type": element["type"],
+            }
+    return None
+
+
 def area_boundry(
     lat: float, lon: float
 ) -> Literal["central", "north", "south", "east", "west"]:
@@ -142,6 +180,18 @@ def main() -> None:
     na_neighborhoods = set(data["neighborhood"].unique()) - set(
         neighborhood_to_area.keys()
     )
+    if na_neighborhoods:
+        for neighborhood in na_neighborhoods:
+            fallback = osm_fallback(neighborhood)
+            if fallback and fallback["lat"] and fallback["lon"]:
+                neighborhood_to_area[neighborhood] = area_boundry(
+                    fallback["lat"], fallback["lon"]
+                )
+                logger.info(
+                    f"Found fallback area for neighborhood {neighborhood} using OSM API"
+                )
+            else:
+                logger.warning(f"No fallback found for neighborhood {neighborhood}")
     logger.warning(f"Neighborhoods not found in Overpass data: {na_neighborhoods}")
     data["area"] = data["neighborhood"].map(neighborhood_to_area).fillna("unknown")
     logger.info("Added area column")

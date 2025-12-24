@@ -41,12 +41,6 @@ paths = config.make_paths(ROOT)
 
 memory = Memory(location=paths.cache / "joblib", verbose=0)
 
-"""
-Context for LLMs
-List of Columns in Aqar_data.csv:
-['listTitle', 'time', 'location', 'size', 'price', 'bedrooms', 'bathrooms', 'details']
-"""
-
 
 @memory.cache
 def get_all_neighborhoods(city: str = "الرياض") -> list[dict]:
@@ -54,18 +48,18 @@ def get_all_neighborhoods(city: str = "الرياض") -> list[dict]:
     overpass_url = "http://overpass-api.de/api/interpreter"
 
     # Overpass QL query to get neighborhoods in the city
+    # Use around filter to get neighborhoods within 50km of Riyadh center (24.7136, 46.6753)
     overpass_query = f"""
-    [out:json];
-    area["name"="{city}"]["admin_level"~"4|5|6"]->.city;
+    [out:json][timeout:180];
     (
-      node["place"~"neighbourhood|suburb"](area.city);
-      way["place"~"neighbourhood|suburb"](area.city);
-      relation["place"~"neighbourhood|suburb"](area.city);
+      node["place"~"neighbourhood|suburb"](around:50000, 24.7136, 46.6753);
+      way["place"~"neighbourhood|suburb"](around:50000, 24.7136, 46.6753);
+      relation["place"~"neighbourhood|suburb"](around:50000, 24.7136, 46.6753);
     );
     out center;
     """
 
-    response = get(overpass_url, params={"data": overpass_query})
+    response = get(overpass_url, params={"data": overpass_query}, timeout=180)
     response.raise_for_status()
     data = response.json()
 
@@ -95,7 +89,7 @@ def get_all_neighborhoods(city: str = "الرياض") -> list[dict]:
 
 def area_boundry(
     lat: float, lon: float
-) -> Literal["central", "north", "south", "east", "west", "unknown"]:
+) -> Literal["central", "north", "south", "east", "west"]:
     NORTH_BOUNDARY = 24.77728
     SOUTH_BOUNDARY = 24.59848
     WEST_BOUNDARY = 46.69277
@@ -135,6 +129,23 @@ def main() -> None:
     )
     logger.info("Normalized text columns and extracted city and neighborhood")
 
+    # Get all neighborhoods and map to area
+    neighborhoods = get_all_neighborhoods()
+    logger.info(f"Fetched {len(neighborhoods)} neighborhoods from Overpass")
+    neighborhood_to_area = {}
+    for n in neighborhoods:
+        if n["lat"] and n["lon"]:
+            # Clean name to match data['neighborhood']
+            name = n["name"].replace("حي", "").strip()
+            neighborhood_to_area[name] = area_boundry(n["lat"], n["lon"])
+    # log NA neighborhoods
+    na_neighborhoods = set(data["neighborhood"].unique()) - set(
+        neighborhood_to_area.keys()
+    )
+    logger.warning(f"Neighborhoods not found in Overpass data: {na_neighborhoods}")
+    data["area"] = data["neighborhood"].map(neighborhood_to_area).fillna("unknown")
+    logger.info("Added area column")
+
     # find outliers in Price column
     data = data.pipe(add_outlier_flag, col="price")
     n_outliers = data["price__is_outlier"].sum()
@@ -143,28 +154,27 @@ def main() -> None:
     # winsorize Price column for better visualization
     data = data.assign(price_winsorized=data["price"].pipe(winsorize))
 
-    # Average Price for each neighborhood
-    logger.info("Computed average winsorized price by neighborhood")
+    # Average Price for each area
+    logger.info("Computed average winsorized price by area")
 
-    avg_price_by_neighborhood = (
-        data.groupby("neighborhood")["price_winsorized"]
+    avg_price_by_area = (
+        data.groupby("area")["price_winsorized"]
         .mean()
         .reset_index()
         .rename(columns={"price_winsorized": "avg_price_winsorized"})
     )
-    logger.info("Computed average winsorized price by neighborhood")
+    logger.info("Computed average winsorized price by area")
 
     fig = px.bar(
-        avg_price_by_neighborhood,
-        x="neighborhood",
+        avg_price_by_area,
+        x="area",
         y="avg_price_winsorized",
-        title="Average Winsorized Price by neighborhood",
+        title="Average Winsorized Price by area",
     )
     fig_path: Path = paths.figures / "price_by_location.html"
     fig_path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(fig_path)
     logger.info(f"Wrote figure to {fig_path}")
-    logger.info(f"List of Columns: {data.columns.tolist()}")
 
 
 if __name__ == "__main__":

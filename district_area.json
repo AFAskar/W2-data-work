@@ -1,0 +1,31 @@
+[
+    {
+        "place_id": 40970032,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "relation",
+        "osm_id": 13254392,
+        "lat": "24.7655143",
+        "lon": "46.6801977",
+        "class": "boundary",
+        "type": "administrative",
+        "place_rank": 20,
+        "importance": 0.14673728160524907,
+        "addresstype": "neighbourhood",
+        "name": "المصيف",
+        "display_name": "المصيف, محافظة الرياض, منطقة الرياض, السعودية",
+        "address": {
+            "neighbourhood": "المصيف",
+            "province": "محافظة الرياض",
+            "state": "منطقة الرياض",
+            "ISO3166-2-lvl4": "SA-01",
+            "country": "السعودية",
+            "country_code": "sa"
+        },
+        "boundingbox": [
+            "24.7534693",
+            "24.7775103",
+            "46.6683763",
+            "46.6946957"
+        ]
+    }
+]

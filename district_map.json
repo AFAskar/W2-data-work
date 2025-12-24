@@ -1,0 +1,51 @@
+[
+    {
+        "place_id": 42394075,
+        "licence": "Data © OpenStreetMap contributors, ODbL 1.0. http://osm.org/copyright",
+        "osm_type": "relation",
+        "osm_id": 13254461,
+        "lat": "24.6561110",
+        "lon": "46.7275000",
+        "class": "boundary",
+        "type": "administrative",
+        "place_rank": 20,
+        "importance": 0.14673728160524907,
+        "addresstype": "neighbourhood",
+        "name": "الملز",
+        "display_name": "الملز, الرياض, محافظة الرياض, منطقة الرياض, السعودية",
+        "address": {
+            "neighbourhood": "الملز",
+            "city": "الرياض",
+            "province": "محافظة الرياض",
+            "state": "منطقة الرياض",
+            "ISO3166-2-lvl4": "SA-01",
+            "country": "السعودية",
+            "country_code": "sa"
+        },
+        "extratags": {
+            "place": "neighbourhood",
+            "GNS:id": "408660",
+            "GNS:dsg_code": "PPLX",
+            "GNS:dsg_name": "section of populated place",
+            "linked_place": "suburb"
+        },
+        "namedetails": {
+            "name": "الملز",
+            "name:ar": "الملز",
+            "name:en": "Al Malaz District",
+            "name:de": "Al Malazz",
+            "_place_name:en": "Al Malazz",
+            "name:fa": "ملز",
+            "name:fr": "Al Malazz",
+            "name:ml": "അൽ-മലസ്",
+            "alt_name": "Al Malaz;Al Mālaz",
+            "int_name": "Al Malazz"
+        },
+        "boundingbox": [
+            "24.6453243",
+            "24.6818114",
+            "46.7160930",
+            "46.7543510"
+        ]
+    }
+]

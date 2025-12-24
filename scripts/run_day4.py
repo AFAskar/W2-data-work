@@ -162,10 +162,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-    # r = get_district_map_data("الملز")
-    # json.dump(
-    #     r,
-    #     open("district_map.json", "w", encoding="utf-8"),
-    #     ensure_ascii=False,
-    #     indent=4,
-    # )

@@ -41,6 +41,12 @@ paths = config.make_paths(ROOT)
 
 memory = Memory(location=paths.cache / "joblib", verbose=0)
 
+"""
+Context for LLMs
+List of Columns in Aqar_data.csv:
+['listTitle', 'time', 'location', 'size', 'price', 'bedrooms', 'bathrooms', 'details']
+"""
+
 
 @memory.cache
 def get_all_neighborhoods(city: str = "الرياض") -> list[dict]:
@@ -114,20 +120,20 @@ def main() -> None:
     logger.info(f"Read {len(data)} rows from Aqar_data.csv")
     # Normalize text columns (normalize_text takes a series and returns a series)
     data = data.assign(
-        Location=data["location"].pipe(normalize_text),
-        Type=data["listTitle"].pipe(normalize_text),
+        location=data["location"].pipe(normalize_text),
+        listTitle=data["listTitle"].pipe(normalize_text),
     )
 
-    # split location into city and district
+    # split location into city and neighborhood
     data = data.assign(
-        district=data["Location"].str.split("-", n=1).str[0].str.strip(),
-        city=data["Location"].str.split("-", n=1).str[1].str.strip(),
+        neighborhood=data["location"].str.split("-", n=1).str[0].str.strip(),
+        city=data["location"].str.split("-", n=1).str[1].str.strip(),
     )
-    # Remove the word "حي" from district
+    # Remove the word "حي" from neighborhood
     data = data.assign(
-        district=data["district"].str.replace("حي", "", regex=False).str.strip()
+        neighborhood=data["neighborhood"].str.replace("حي", "", regex=False).str.strip()
     )
-    logger.info("Normalized text columns and extracted city and district")
+    logger.info("Normalized text columns and extracted city and neighborhood")
 
     # find outliers in Price column
     data = data.pipe(add_outlier_flag, col="price")
@@ -137,27 +143,28 @@ def main() -> None:
     # winsorize Price column for better visualization
     data = data.assign(price_winsorized=data["price"].pipe(winsorize))
 
-    # Average Price for each district
-    logger.info("Computed average winsorized price by district")
+    # Average Price for each neighborhood
+    logger.info("Computed average winsorized price by neighborhood")
 
-    avg_price_by_district = (
-        data.groupby("district")["price_winsorized"]
+    avg_price_by_neighborhood = (
+        data.groupby("neighborhood")["price_winsorized"]
         .mean()
         .reset_index()
         .rename(columns={"price_winsorized": "avg_price_winsorized"})
     )
-    logger.info("Computed average winsorized price by district")
+    logger.info("Computed average winsorized price by neighborhood")
 
     fig = px.bar(
-        avg_price_by_district,
-        x="district",
+        avg_price_by_neighborhood,
+        x="neighborhood",
         y="avg_price_winsorized",
-        title="Average Winsorized Price by District",
+        title="Average Winsorized Price by neighborhood",
     )
     fig_path: Path = paths.figures / "price_by_location.html"
     fig_path.parent.mkdir(parents=True, exist_ok=True)
     fig.write_html(fig_path)
     logger.info(f"Wrote figure to {fig_path}")
+    logger.info(f"List of Columns: {data.columns.tolist()}")
 
 
 if __name__ == "__main__":

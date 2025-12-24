@@ -43,43 +43,57 @@ memory = Memory(location=paths.cache / "joblib", verbose=0)
 
 
 @memory.cache
-def get_district_map_data(
-    district: str,
-) -> str:
-    district = district.lower()
-    # lookup district using OSM API must have addresstype of neighbourhood
-    response = get(
-        "https://nominatim.openstreetmap.org/search",
-        params={
-            "q": district,
-            "format": "json",
-            "addressdetails": 1,
-            "limit": 1,
-            "extratags": 1,
-            "namedetails": 1,
-            "accept-language": "ar",
-            "featuretype": "neighbourhood",
-        },
-    )
-    return response.json()
+def get_all_neighborhoods(city: str = "الرياض") -> list[dict]:
+    """use The Overpass API to get all neighborhoods in a city"""
+    overpass_url = "http://overpass-api.de/api/interpreter"
+
+    # Overpass QL query to get neighborhoods in the city
+    overpass_query = f"""
+    [out:json];
+    area["name"="{city}"]["admin_level"~"4|5|6"]->.city;
+    (
+      node["place"~"neighbourhood|suburb"](area.city);
+      way["place"~"neighbourhood|suburb"](area.city);
+      relation["place"~"neighbourhood|suburb"](area.city);
+    );
+    out center;
+    """
+
+    response = get(overpass_url, params={"data": overpass_query})
+    response.raise_for_status()
+    data = response.json()
+
+    neighborhoods = []
+    for element in data.get("elements", []):
+        if "tags" in element and "name" in element["tags"]:
+            # Get center coordinates
+            if element["type"] == "node":
+                lat, lon = element["lat"], element["lon"]
+            elif "center" in element:
+                lat, lon = element["center"]["lat"], element["center"]["lon"]
+            else:
+                lat, lon = None, None
+
+            neighborhoods.append(
+                {
+                    "name": element["tags"]["name"],
+                    "lat": lat,
+                    "lon": lon,
+                    "osm_id": element["id"],
+                    "osm_type": element["type"],
+                }
+            )
+
+    return neighborhoods
 
 
-def map_district_to_area(
-    district_map_data: dict,
+def area_boundry(
+    lat: float, lon: float
 ) -> Literal["central", "north", "south", "east", "west", "unknown"]:
-    if not district_map_data:
-        return "unknown"
-    lat = float(district_map_data[0]["lat"])
-    lon = float(district_map_data[0]["lon"])
-    # North is Above 24.77728 lat
     NORTH_BOUNDARY = 24.77728
-    # south is Below 24.59848
     SOUTH_BOUNDARY = 24.59848
-    # west is Below 46.69277
     WEST_BOUNDARY = 46.69277
-    # east is Above 46.77850
     EAST_BOUNDARY = 46.77850
-    # Simple logic based on lat/lon to determine area
     if lat > NORTH_BOUNDARY:
         return "north"
     elif lat < SOUTH_BOUNDARY:
@@ -123,12 +137,9 @@ def main() -> None:
     # winsorize Price column for better visualization
     data = data.assign(price_winsorized=data["price"].pipe(winsorize))
 
-    data = data.assign(
-        area=data["district"].apply(get_district_map_data).apply(map_district_to_area)
-    )
-    logger.info("Mapped districts to areas")
-
     # Average Price for each district
+    logger.info("Computed average winsorized price by district")
+
     avg_price_by_district = (
         data.groupby("district")["price_winsorized"]
         .mean()
@@ -137,19 +148,11 @@ def main() -> None:
     )
     logger.info("Computed average winsorized price by district")
 
-    avg_price_by_area = (
-        data.groupby("area")["price_winsorized"]
-        .mean()
-        .reset_index()
-        .rename(columns={"price_winsorized": "avg_price_winsorized"})
-    )
-    logger.info("Computed average winsorized price by area")
-
     fig = px.bar(
-        avg_price_by_area,
-        x="area",
+        avg_price_by_district,
+        x="district",
         y="avg_price_winsorized",
-        title="Average Winsorized Price by Area",
+        title="Average Winsorized Price by District",
     )
     fig_path: Path = paths.figures / "price_by_location.html"
     fig_path.parent.mkdir(parents=True, exist_ok=True)

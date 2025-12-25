@@ -90,7 +90,7 @@ def get_all_neighborhoods(city: str = "الرياض") -> list[dict]:
 # fall back to OSM API for Missing neighborhoods
 @memory.cache
 def osm_fallback(neighborhood: str) -> dict | None:
-    overpass_url = "http://overpass-api.de/api/interpreter"
+    overpass_url = "https://overpass.private.coffee/api/interpreter"
 
     overpass_query = f"""
     [out:json][timeout:180];
@@ -122,6 +122,29 @@ def osm_fallback(neighborhood: str) -> dict | None:
                 "osm_id": element["id"],
                 "osm_type": element["type"],
             }
+    return None
+
+
+def fallback_fallback(query: str) -> dict | None:
+    """Use Nominatim API as a last resort to get neighborhood coordinates"""
+    nominatim_url = "https://nominatim.openstreetmap.org/search"
+    params = {
+        "q": query,
+        "format": "json",
+        "addressdetails": 1,
+        "limit": 1,
+    }
+    response = get(nominatim_url, params=params, timeout=30)
+    response.raise_for_status()
+    data = response.json()
+    if data:
+        lat = float(data[0]["lat"])
+        lon = float(data[0]["lon"])
+        return {
+            "name": query,
+            "lat": lat,
+            "lon": lon,
+        }
     return None
 
 
@@ -188,11 +211,35 @@ def main() -> None:
                     fallback["lat"], fallback["lon"]
                 )
                 logger.info(
-                    f"Found fallback area for neighborhood {neighborhood} using OSM API"
+                    f"Found fallback area for neighborhood {neighborhood} using a different Overpass Query"
                 )
             else:
-                logger.warning(f"No fallback found for neighborhood {neighborhood}")
-    logger.warning(f"Neighborhoods not found in Overpass data: {na_neighborhoods}")
+                logger.warning(
+                    f"No fallback found for neighborhood {neighborhood}! using OSM API Fallback"
+                )
+                nominatim_fallback = fallback_fallback(neighborhood)
+                if (
+                    nominatim_fallback
+                    and nominatim_fallback["lat"]
+                    and nominatim_fallback["lon"]
+                ):
+                    neighborhood_to_area[neighborhood] = area_boundry(
+                        nominatim_fallback["lat"], nominatim_fallback["lon"]
+                    )
+                    logger.info(
+                        f"Found fallback area for neighborhood {neighborhood} using Nominatim API"
+                    )
+                else:
+                    logger.error(
+                        f"No coordinates found for neighborhood {neighborhood} using Nominatim API!"
+                    )
+
+    # recalculate na_neighborhoods
+    na_neighborhoods = set(data["neighborhood"].unique()) - set(
+        neighborhood_to_area.keys()
+    )
+    if na_neighborhoods:
+        logger.warning(f"Neighborhoods not found in Overpass data: {na_neighborhoods}")
     data["area"] = data["neighborhood"].map(neighborhood_to_area).fillna("unknown")
     logger.info("Added area column")
 

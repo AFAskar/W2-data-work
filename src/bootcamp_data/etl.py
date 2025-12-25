@@ -1,7 +1,5 @@
 from __future__ import annotations
-from joblib import load
-from jedi.inference.analysis import add
-
+import json
 from datetime import datetime, timezone
 import logging
 import pandas as pd
@@ -35,7 +33,6 @@ from bootcamp_data.joins import safe_left_join
 from pathlib import Path
 
 from dataclasses import dataclass
-from pathlib import Path
 
 
 @dataclass(frozen=True)
@@ -83,7 +80,7 @@ def write_run_metadata(
         "path_out_users": str(cfg.out_users),
         "path_out_analytics": str(cfg.out_analytics),
     }
-    return
+    json.dump(meta, open(cfg.run_meta, "w"), indent=2)
 
 
 def load_inputs(cfg: ETLConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
@@ -93,7 +90,7 @@ def load_inputs(cfg: ETLConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
     return orders, users
 
 
-def transfroms(orders_raw: pd.DataFrame, users: pd.DataFrame):
+def transforms(orders_raw: pd.DataFrame, users: pd.DataFrame) -> pd.DataFrame:
     require_columns(
         orders_raw,
         [
@@ -149,7 +146,7 @@ def transfroms(orders_raw: pd.DataFrame, users: pd.DataFrame):
     match_rate = 1.0 - float(joined["country"].isna().mean())
     joined = joined.assign(amount_winsor=winsorize(joined["amount"]))
     joined = add_outlier_flag(joined, "amount", k=1.5)
-    return joined, n_missing_ts, match_rate
+    return joined
 
 
 def load_outputs(
@@ -176,8 +173,12 @@ def run_etl(cfg: ETLConfig) -> None:
     logger.info("ETL job started at %s", start_time.isoformat())
 
     orders, users = load_inputs(cfg)
-    orders_transformed, users_transformed = transfroms(orders, users)
-
+    orders_cleaned = transforms(orders, users)
+    load_outputs(
+        analytics=orders_cleaned,
+        users=users,
+        cfg=cfg,
+    )
     end_time = datetime.now(timezone.utc)
     logger.info("ETL job finished at %s", end_time.isoformat())
     run_metadata = {
@@ -185,13 +186,14 @@ def run_etl(cfg: ETLConfig) -> None:
         "end_time": end_time.isoformat(),
         "duration_seconds": (end_time - start_time).total_seconds(),
         "rows_processed": {
-            "orders": len(orders_transformed),
-            "users": len(users_transformed),
+            "orders": len(orders_cleaned),
+            "users": len(users),
         },
     }
+
     write_run_metadata(
         cfg,
         orders_raw=orders,
         users=users,
-        analytics=orders_transformed,
+        analytics=orders_cleaned,
     )

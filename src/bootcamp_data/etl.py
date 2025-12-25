@@ -1,14 +1,15 @@
-from numpy.typing.tests.test_isfile import ROOT
+from __future__ import annotations
+from joblib import load
+from jedi.inference.analysis import add
+
 from datetime import datetime, timezone
 import logging
-from IPython.testing.plugin.ipdoctest import log
 import pandas as pd
 import bootcamp_data.config as config
 from bootcamp_data.io import (
     read_order_csv,
     read_user_csv,
     write_parquet,
-    write_run_metadata,
 )
 from bootcamp_data.transforms import (
     add_missing_flags,
@@ -33,21 +34,68 @@ from bootcamp_data.joins import safe_left_join
 
 from pathlib import Path
 
+from dataclasses import dataclass
+from pathlib import Path
+
+
+@dataclass(frozen=True)
+class ETLConfig:
+    root: Path
+    raw_orders: Path
+    raw_users: Path
+    out_orders_clean: Path
+    out_users: Path
+    out_analytics: Path
+    run_meta: Path
+
+
 logger = logging.getLogger(__name__)
 
-ROOT = Path(__file__).resolve().parents[1]
+
+def write_run_metadata(
+    cfg: ETLConfig,
+    *,
+    orders_raw: pd.DataFrame,
+    users: pd.DataFrame,
+    analytics: pd.DataFrame,
+) -> None:
+    missing_created_at = (
+        int(analytics["created_at"].isna().sum())
+        if "created_at" in analytics.columns
+        else None
+    )
+    country_match_rate = (
+        1.0 - float(analytics["country"].isna().mean())
+        if "country" in analytics.columns
+        else None
+    )
+
+    meta = {
+        "rows in orders raw": int(len(orders_raw)),
+        "rows in users": int(len(users)),
+        "rows in analytics": int(len(analytics)),
+        "missing created_at in analytics": missing_created_at,
+        "country match rate in analytics": country_match_rate,
+        "etl_run_time": datetime.now(timezone.utc).isoformat(),
+        "path_orders_raw": str(cfg.raw_orders),
+        "path_users": str(cfg.raw_users),
+        "path_out_orders_clean": str(cfg.out_orders_clean),
+        "path_out_users": str(cfg.out_users),
+        "path_out_analytics": str(cfg.out_analytics),
+    }
+    return
 
 
-def load_inputs(order_csv: Path, user_csv: Path) -> tuple[pd.DataFrame, pd.DataFrame]:
-    orders = read_order_csv(order_csv)
-    users = read_user_csv(user_csv)
+def load_inputs(cfg: ETLConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
+    orders = read_order_csv(cfg.raw_orders)
+    users = read_user_csv(cfg.raw_users)
 
     return orders, users
 
 
-def transfroms(orders: pd.DataFrame, users: pd.DataFrame):
+def transfroms(orders_raw: pd.DataFrame, users: pd.DataFrame):
     require_columns(
-        orders,
+        orders_raw,
         [
             "order_id",
             "user_id",
@@ -65,9 +113,20 @@ def transfroms(orders: pd.DataFrame, users: pd.DataFrame):
             "signup_date",
         ],
     )
-    orders = enforce_order_schema(orders)
+    status_map = {"paid": "paid", "refund": "refund", "refunded": "refund"}
 
-    users = enforce_user_schema(users)
+    orders = (
+        orders_raw.pipe(enforce_order_schema)
+        .assign(
+            status_clean=lambda d: apply_mapping(
+                normalize_text(d["status"]), status_map
+            )
+        )
+        .pipe(add_missing_flags, cols=["amount", "quantity"])
+        .pipe(parse_datetime, col="created_at", utc=True)
+    )
+
+    users = users.pipe(enforce_user_schema)
     assert_non_empty(orders)
     assert_non_empty(users)
     assert_unique_key(users, "user_id", allow_na=False)
@@ -93,39 +152,32 @@ def transfroms(orders: pd.DataFrame, users: pd.DataFrame):
     return joined, n_missing_ts, match_rate
 
 
-def save_outputs(
-    orders_transformed: pd.DataFrame,
-    users_transformed: pd.DataFrame,
-    output_path: Path,
+def load_outputs(
+    *, analytics: pd.DataFrame, users: pd.DataFrame, cfg: ETLConfig
 ) -> None:
-    write_parquet(orders_transformed, output_path / "orders.parquet")
-    write_parquet(users_transformed, output_path / "users.parquet")
-    # missigness report
-    missingness_report(orders_transformed).to_csv(
-        output_path / "orders_missingness.csv"
-    )
-    missingness_report(users_transformed).to_csv(output_path / "users_missingness.csv")
+    """Write processed artifacts (idempotent)."""
+    write_parquet(users, cfg.out_users)
+    write_parquet(analytics, cfg.out_analytics)
+
+    user_side_cols = [c for c in users.columns if c != "user_id"]
+    cols_to_drop = [c for c in user_side_cols if c in analytics.columns] + [
+        c for c in analytics.columns if c.endswith("_user")
+    ]
+    orders_clean = analytics.drop(columns=cols_to_drop, errors="ignore")
+    write_parquet(orders_clean, cfg.out_orders_clean)
 
 
-def run_etl():
-
+def run_etl(cfg: ETLConfig) -> None:
     logging.basicConfig(
         level=logging.INFO, format="%(levelname)s %(name)s: %(message)s"
     )
+
     start_time = datetime.now(timezone.utc)
     logger.info("ETL job started at %s", start_time.isoformat())
-    paths = config.make_paths(ROOT)
 
-    orders, users = load_inputs(
-        order_csv=paths.raw / "orders.csv",
-        user_csv=paths.raw / "users.csv",
-    )
+    orders, users = load_inputs(cfg)
     orders_transformed, users_transformed = transfroms(orders, users)
-    save_outputs(
-        orders_transformed,
-        users_transformed,
-        output_path=paths.processed,
-    )
+
     end_time = datetime.now(timezone.utc)
     logger.info("ETL job finished at %s", end_time.isoformat())
     run_metadata = {
@@ -137,8 +189,9 @@ def run_etl():
             "users": len(users_transformed),
         },
     }
-    write_run_metadata(run_metadata, paths.cache / "etl_run_metadata.json")
-
-
-if __name__ == "__main__":
-    run_etl()
+    write_run_metadata(
+        cfg,
+        orders_raw=orders,
+        users=users,
+        analytics=orders_transformed,
+    )

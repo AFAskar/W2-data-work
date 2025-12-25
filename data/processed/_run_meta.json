@@ -1,11 +1,13 @@
 {
-  "timestamp_utc": "2025-12-23T15:28:17.157733+00:00",
-  "rows": {
-    "orders": 5,
-    "users": 4
-  },
-  "outputs": {
-    "orders": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/processed/orders.parquet",
-    "users": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/processed/users.parquet"
-  }
+  "rows in orders raw": 5,
+  "rows in users": 4,
+  "rows in analytics": 5,
+  "missing created_at in analytics": 1,
+  "country match rate in analytics": 1.0,
+  "etl_run_time": "2025-12-25T20:03:48.979426+00:00",
+  "path_orders_raw": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/raw/orders.csv",
+  "path_users": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/raw/users.csv",
+  "path_out_orders_clean": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/processed/orders_clean.parquet",
+  "path_out_users": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/processed/users.parquet",
+  "path_out_analytics": "/home/azoz-laptop/Desktop/Git-Projects/W2/data/processed/analytics_table.parquet"
 }

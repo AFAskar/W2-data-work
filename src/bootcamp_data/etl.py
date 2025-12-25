@@ -173,7 +173,9 @@ def run_etl(cfg: ETLConfig) -> None:
     logger.info("ETL job started at %s", start_time.isoformat())
 
     orders, users = load_inputs(cfg)
+    logger.info("Loaded %d orders, %d users", len(orders), len(users))
     orders_cleaned = transforms(orders, users)
+    logger.info("Transformed to %d analytics rows", len(orders_cleaned))
     load_outputs(
         analytics=orders_cleaned,
         users=users,

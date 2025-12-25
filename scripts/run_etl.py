@@ -31,8 +31,8 @@ def main() -> None:
         raw_users=paths.raw / "users.csv",
         out_orders_clean=paths.processed / "orders_clean.parquet",
         out_users=paths.processed / "users.parquet",
-        out_analytics=paths.processed / "orders_analytics.parquet",
-        run_meta=paths.cache / "etl_run_metadata.json",
+        out_analytics=paths.processed / "analytics_table.parquet",
+        run_meta=paths.processed / "_run_meta.json",
     )
     run_etl(cfg)
 

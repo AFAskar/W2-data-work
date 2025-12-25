@@ -90,7 +90,9 @@ def load_inputs(cfg: ETLConfig) -> tuple[pd.DataFrame, pd.DataFrame]:
     return orders, users
 
 
-def transforms(orders_raw: pd.DataFrame, users: pd.DataFrame) -> pd.DataFrame:
+def transforms(
+    orders_raw: pd.DataFrame, users: pd.DataFrame
+) -> tuple[pd.DataFrame, pd.DataFrame]:
     require_columns(
         orders_raw,
         [
@@ -146,7 +148,7 @@ def transforms(orders_raw: pd.DataFrame, users: pd.DataFrame) -> pd.DataFrame:
     match_rate = 1.0 - float(joined["country"].isna().mean())
     joined = joined.assign(amount_winsor=winsorize(joined["amount"]))
     joined = add_outlier_flag(joined, "amount", k=1.5)
-    return joined
+    return joined, users_t
 
 
 def load_outputs(
@@ -174,11 +176,11 @@ def run_etl(cfg: ETLConfig) -> None:
 
     orders, users = load_inputs(cfg)
     logger.info("Loaded %d orders, %d users", len(orders), len(users))
-    orders_cleaned = transforms(orders, users)
+    orders_cleaned, users_cleaned = transforms(orders, users)
     logger.info("Transformed to %d analytics rows", len(orders_cleaned))
     load_outputs(
         analytics=orders_cleaned,
-        users=users,
+        users=users_cleaned,
         cfg=cfg,
     )
     end_time = datetime.now(timezone.utc)
@@ -189,13 +191,13 @@ def run_etl(cfg: ETLConfig) -> None:
         "duration_seconds": (end_time - start_time).total_seconds(),
         "rows_processed": {
             "orders": len(orders_cleaned),
-            "users": len(users),
+            "users": len(users_cleaned),
         },
     }
 
     write_run_metadata(
         cfg,
         orders_raw=orders,
-        users=users,
+        users=users_cleaned,
         analytics=orders_cleaned,
     )

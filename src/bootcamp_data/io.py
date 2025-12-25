@@ -44,6 +44,13 @@ def read_user_csv(filepath: Path) -> pd.DataFrame:
     return df
 
 
+def write_run_metadata(metadata: dict, outpath: Path = Path("run_metadata.json")):
+    outpath.parent.mkdir(parents=True, exist_ok=True)
+    with open(outpath, "w") as f:
+        json.dump(metadata, f, indent=4)
+    return
+
+
 def write_parquet(df: pd.DataFrame, outpath: Path):
     outpath.parent.mkdir(parents=True, exist_ok=True)
     df.to_parquet(outpath, index=False)
